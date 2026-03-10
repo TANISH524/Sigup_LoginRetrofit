@@ -19,85 +19,153 @@ fun SignupScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    val isLoading by viewModel.isLoading.collectAsState()
-    val result by viewModel.result.collectAsState()
+    //  Error states
+    var nameError by remember { mutableStateOf("") }
+    var emailError by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf("") }
 
-    // Signup hua? Login pe jao!
-    LaunchedEffect(result) {
-        if (result?.startsWith("yes") == true) {
-            navController.navigate("login")  // ← Seedha navigate karo
+    val authState by viewModel.authState.collectAsState()
+
+    LaunchedEffect(authState) {
+        if (authState is ApiResult.Success) {
+            navController.navigate("login")
         }
     }
 
+    //  Validation function
+    fun validate(): Boolean {
+        var isValid = true
+
+        if (name.trim().isEmpty()) {
+            nameError = "enter the name!"
+            isValid = false
+        } else {
+            nameError = ""
+        }
+
+        if (email.trim().isEmpty()) {
+            emailError = "fill email!"
+            isValid = false
+        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+            emailError = "correct email!"
+            isValid = false
+        } else {
+            emailError = ""
+        }
+
+        if (password.trim().isEmpty()) {
+            passwordError = "Password required hai!"
+            isValid = false
+        } else if (password.length < 6) {
+            passwordError = "Password kam se kam 6 characters ka hona chahiye!"
+            isValid = false
+        } else {
+            passwordError = ""
+        }
+
+        return isValid
+    }
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = " Signup",
-            style = MaterialTheme.typography.headlineLarge
-        )
-
+        Text("Signup", style = MaterialTheme.typography.headlineLarge)
         Spacer(modifier = Modifier.height(32.dp))
 
+        //  Name field
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
+            onValueChange = {
+                name = it
+                if (it.trim().isNotEmpty()) nameError = ""
+            },
             label = { Text("Name") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = nameError.isNotEmpty(),
+            supportingText = {
+                if (nameError.isNotEmpty()) {
+                    Text(text = nameError, color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(12.dp))
-
+        //  Email field
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = {
+                email = it
+                if (it.trim().isNotEmpty()) emailError = ""
+            },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = emailError.isNotEmpty(),
+            supportingText = {
+                if (emailError.isNotEmpty()) {
+                    Text(text = emailError, color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(12.dp))
-
+        //  Password field
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                if (it.length >= 6) passwordError = ""
+            },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = passwordError.isNotEmpty(),
+            supportingText = {
+                if (passwordError.isNotEmpty()) {
+                    Text(text = passwordError, color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
-
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (isLoading) {
-            CircularProgressIndicator()
-        } else {
-            Button(
-                onClick = { viewModel.signup(name, email, password) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Signup ")
-
-            }
-        }
-        Button(onClick = {
-            navController.navigate("login")
-        }) {
-
-            Text(text = "Back to login")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        result?.let {
-            if (!it.startsWith("yes")) {
+        when (authState) {
+            is ApiResult.Loading -> CircularProgressIndicator()
+            is ApiResult.Error -> {
                 Text(
-                    text = it,
+                    text = (authState as ApiResult.Error).message,
                     color = MaterialTheme.colorScheme.error
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (validate()) {
+                            viewModel.signup(name.trim(), email.trim(), password)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Signup")
+                }
             }
+            else -> {
+                Button(
+                    onClick = {
+                        // Pehle validate karo, tab hi API call karo
+                        if (validate()) {
+                            viewModel.signup(name.trim(), email.trim(), password)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Signup")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = { navController.navigate("login") }) {
+            Text("Back to Login")
         }
     }
 }

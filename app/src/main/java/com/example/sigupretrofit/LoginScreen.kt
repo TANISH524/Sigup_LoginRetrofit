@@ -18,68 +18,129 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    val isLoading by viewModel.isLoading.collectAsState()
-    val result by viewModel.result.collectAsState()
+    //  Error states
+    var emailError by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf("") }
 
-    // Result reset karo
+    val authState by viewModel.authState.collectAsState()
+    val isLoginSuccess by viewModel.isLoginSuccess.collectAsState()
+
     LaunchedEffect(Unit) {
-        viewModel.resetResult()
+        viewModel.resetAuthState()
+    }
+
+    LaunchedEffect(isLoginSuccess) {
+        if (isLoginSuccess) {
+            navController.navigate("home") {
+                popUpTo("login") { inclusive = true }
+            }
+        }
+    }
+
+    // Validation function
+    fun validate(): Boolean {
+        var isValid = true
+
+        if (email.trim().isEmpty()) {
+            emailError = "fill email!"
+            isValid = false
+        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+            emailError = "fill correct email!"
+            isValid = false
+        } else {
+            emailError = ""
+        }
+
+        if (password.trim().isEmpty()) {
+            passwordError = "fill password!"
+            isValid = false
+        } else if (password.length < 6) {
+            passwordError = "at least 6 char password"
+            isValid = false
+        } else {
+            passwordError = ""
+        }
+
+        return isValid
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = " Login",
-            style = MaterialTheme.typography.headlineLarge
-        )
-
+        Text("Login", style = MaterialTheme.typography.headlineLarge)
         Spacer(modifier = Modifier.height(32.dp))
 
+        //  Email field
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = {
+                email = it
+                if (it.trim().isNotEmpty()) emailError = ""
+            },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = emailError.isNotEmpty(),
+            supportingText = {
+                if (emailError.isNotEmpty()) {
+                    Text(text = emailError, color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(12.dp))
-
+        //  Password field
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                if (it.length >= 6) passwordError = ""
+            },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = passwordError.isNotEmpty(),
+            supportingText = {
+                if (passwordError.isNotEmpty()) {
+                    Text(text = passwordError, color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
-
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (isLoading) {
-            CircularProgressIndicator()
-        } else {
-            Button(
-                onClick = { viewModel.login(email, password) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Login ")
+        when (authState) {
+            is ApiResult.Loading -> CircularProgressIndicator()
+            is ApiResult.Error -> {
+                Text(
+                    text = (authState as ApiResult.Error).message,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (validate()) {
+                            viewModel.login(email.trim(), password)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Login")
+                }
             }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        result?.let {
-            Text(
-                text = it,
-                color = if (it.startsWith("yes"))
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.error
-            )
+            else -> {
+                Button(
+                    onClick = {
+                        //  Pehle validate karo, tab hi API call karo
+                        if (validate()) {
+                            viewModel.login(email.trim(), password)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Login")
+                }
+            }
         }
     }
 }
